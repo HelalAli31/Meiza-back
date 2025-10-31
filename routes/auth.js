@@ -10,10 +10,13 @@ const sign = (user) =>
     process.env.JWT_SECRET,
     { expiresIn: "7d" }
   );
-
+console.log("inside")
 // Register
+
+
 router.post("/register", async (req, res) => {
   try {
+    console.log("inside reigster")
     const { name, email, password, roles } = req.body;
     const user = await User.create({ name, email, password, roles });
     const token = sign(user);

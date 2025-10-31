@@ -15,13 +15,7 @@ const ordersRouter = require("./routes/orders");
 createConnection();
 //Routes
 const app = express();
-app.use(
-  cors({
-    origin: "*",
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-  })
-);
+
 
 const path = require("path");
 
@@ -33,7 +27,8 @@ app.use(bodyParser.json());
 // app.use("/auth", userRoute);
 app.use("/products", productsRoute);
 app.use("/categories", categoriesRoute);
-// public
+// 
+console.log("before")
 app.use("/auth", authRouter);
 
 // protected example for /auth/me
