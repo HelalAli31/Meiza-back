@@ -16,7 +16,6 @@ createConnection();
 //Routes
 const app = express();
 
-
 const path = require("path");
 
 app.use(cors());
@@ -27,8 +26,8 @@ app.use(bodyParser.json());
 // app.use("/auth", userRoute);
 app.use("/products", productsRoute);
 app.use("/categories", categoriesRoute);
-// 
-console.log("before")
+//
+console.log("before");
 app.use("/auth", authRouter);
 
 // protected example for /auth/me
