@@ -1,3 +1,4 @@
+// routes/cart.js
 const express = require("express");
 const mongoose = require("mongoose");
 const Cart = require("../models/cart");
@@ -7,7 +8,7 @@ const { auth } = require("../middleware/auth");
 const router = express.Router();
 const isId = (id) => mongoose.Types.ObjectId.isValid(id);
 
-// ensure cart
+// helper: ensure cart
 async function getOrCreateCart(userId) {
   let cart = await Cart.findOne({ user: userId });
   if (!cart) cart = await Cart.create({ user: userId, items: [] });
@@ -15,13 +16,15 @@ async function getOrCreateCart(userId) {
 }
 
 // GET my cart
-router.get("/", auth, async (req, res) => {
-  const cart = await getOrCreateCart(req.user._id);
-  res.json({ cart, subtotal: cart.subtotal() });
+router.get("/", auth, async (req, res, next) => {
+  try {
+    const cart = await getOrCreateCart(req.user._id);
+    return res.json({ cart, subtotal: cart.subtotal() });
+  } catch (e) { next(e); }
 });
 
 // ADD item
-router.post("/items", auth, async (req, res) => {
+router.post("/items", auth, async (req, res, next) => {
   try {
     const { productId, optionId, quantity = 1 } = req.body;
     if (!isId(productId) || !isId(optionId))
@@ -31,6 +34,7 @@ router.post("/items", auth, async (req, res) => {
 
     const product = await Product.findById(productId).lean();
     if (!product) return res.status(404).json({ error: "Product not found" });
+
     const option = (product.options || []).find(
       (o) => o._id?.toString() === optionId
     );
@@ -46,6 +50,7 @@ router.post("/items", auth, async (req, res) => {
         it.product.toString() === productId &&
         it.optionId.toString() === optionId
     );
+
     if (existing) existing.quantity += quantity;
     else
       cart.items.push({
@@ -59,56 +64,64 @@ router.post("/items", auth, async (req, res) => {
       });
 
     await cart.save();
-    res.status(201).json({ cart, subtotal: cart.subtotal() });
-  } catch (e) {
-    res.status(400).json({ error: e.message });
-  }
+    return res.status(201).json({ cart, subtotal: cart.subtotal() });
+  } catch (e) { next(e); }
 });
 
-// UPDATE item quantity
-router.patch("/items/:itemId", auth, async (req, res) => {
-  const { itemId } = req.params;
-  const { quantity } = req.body;
-  if (!isId(itemId)) return res.status(400).json({ error: "Invalid itemId" });
-  if (quantity <= 0)
-    return res.status(400).json({ error: "Quantity must be >= 1" });
+// UPDATE qty
+router.patch("/items/:itemId", auth, async (req, res, next) => {
+  try {
+    const { itemId } = req.params;
+    const { quantity } = req.body;
+    if (!isId(itemId)) return res.status(400).json({ error: "Invalid itemId" });
+    if (quantity <= 0)
+      return res.status(400).json({ error: "Quantity must be >= 1" });
 
-  const cart = await getOrCreateCart(req.user._id);
-  const item = cart.items.id(itemId);
-  if (!item) return res.status(404).json({ error: "Item not found" });
+    const cart = await getOrCreateCart(req.user._id);
+    const item = cart.items.id(itemId);
+    if (!item) return res.status(404).json({ error: "Item not found" });
 
-  // stock check
-  const product = await Product.findById(item.product).lean();
-  const option = (product?.options || []).find(
-    (o) => o._id?.toString() === item.optionId.toString()
-  );
-  if (!option || (option.quantity || 0) < quantity)
-    return res.status(400).json({ error: "Not enough stock" });
+    // stock check
+    const product = await Product.findById(item.product).lean();
+    const option = (product?.options || []).find(
+      (o) => o._id?.toString() === item.optionId.toString()
+    );
+    if (!option || (option.quantity || 0) < quantity)
+      return res.status(400).json({ error: "Not enough stock" });
 
-  item.quantity = quantity;
-  await cart.save();
-  res.json({ cart, subtotal: cart.subtotal() });
+    item.quantity = quantity;
+    await cart.save();
+    return res.json({ cart, subtotal: cart.subtotal() });
+  } catch (e) { next(e); }
 });
 
-// DELETE item
-router.delete("/items/:itemId", auth, async (req, res) => {
-  const { itemId } = req.params;
-  if (!isId(itemId)) return res.status(400).json({ error: "Invalid itemId" });
+// DELETE item  ✅ use $pull and try/catch
+router.delete("/items/:itemId", auth, async (req, res, next) => {
+  try {
+    const { itemId } = req.params;
+    if (!isId(itemId)) return res.status(400).json({ error: "Invalid itemId" });
 
-  const cart = await getOrCreateCart(req.user._id);
-  const item = cart.items.id(itemId);
-  if (!item) return res.status(404).json({ error: "Item not found" });
-  item.remove();
-  await cart.save();
-  res.json({ cart, subtotal: cart.subtotal() });
+    const cart = await getOrCreateCart(req.user._id);
+
+    // remove via $pull to avoid subdoc remove() pitfalls
+    await Cart.updateOne(
+      { _id: cart._id },
+      { $pull: { items: { _id: new mongoose.Types.ObjectId(itemId) } } }
+    );
+
+    const fresh = await Cart.findById(cart._id);
+    return res.json({ cart: fresh, subtotal: fresh.subtotal() });
+  } catch (e) { next(e); }
 });
 
-// CLEAR cart
-router.delete("/", auth, async (req, res) => {
-  const cart = await getOrCreateCart(req.user._id);
-  cart.items = [];
-  await cart.save();
-  res.json({ cleared: true });
+// CLEAR
+router.delete("/", auth, async (req, res, next) => {
+  try {
+    const cart = await getOrCreateCart(req.user._id);
+    cart.items = [];
+    await cart.save();
+    return res.json({ cleared: true });
+  } catch (e) { next(e); }
 });
 
 module.exports = router;
