@@ -89,4 +89,24 @@ router.get("/me", auth, async (req, res) => {
   });
 });
 
+router.put("/me", auth, async (req, res) => {
+  try {
+    const allowed = ["name", "username", "password"];
+    const updates = {};
+    for (const k of allowed) if (req.body[k] != null) updates[k] = req.body[k];
+
+    const u = await User.findById(req.user._id);
+    if (!u) return res.status(404).json({ error: "Not found" });
+
+    Object.assign(u, updates);
+    await u.save();
+
+    const out = u.toObject();
+    delete out.password;
+    res.json({ user: out });
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
 module.exports = router;

@@ -12,6 +12,7 @@ const authRouter = require("./routes/auth");
 const usersRouter = require("./routes/users");
 const cartRouter = require("./routes/cart");
 const ordersRouter = require("./routes/orders");
+const contactRoutes = require("./routes/contact");
 createConnection();
 //Routes
 const app = express();
@@ -29,7 +30,7 @@ app.use("/categories", categoriesRoute);
 //
 console.log("before");
 app.use("/auth", authRouter);
-
+app.use("/contact", contactRoutes);
 // protected example for /auth/me
 app.use("/", auth, (req, _res, next) => next());
 
