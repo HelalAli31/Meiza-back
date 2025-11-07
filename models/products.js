@@ -13,6 +13,7 @@ const productSchema = new mongoose.Schema({
       {
         name: String,
         price: Number,
+        vipPrice: Number,
         isDefault: Boolean,
         quantity: Number,
         img: String,
